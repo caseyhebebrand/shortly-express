@@ -15,9 +15,16 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '../public')));
 
+var isLoggedIn = false;
+var checkLogin = function(req, res, next) {
+  if (isLoggedIn) {
+    next();
+  } else {
+    res.redirect('/login');
+  }
+};
 
-
-app.get('/', 
+app.get('/', checkLogin,
 (req, res) => {
   res.render('index');
 });
@@ -25,6 +32,27 @@ app.get('/',
 app.get('/create', 
 (req, res) => {
   res.render('index');
+});
+
+app.get('/login', 
+(req, res) => {
+  res.render('login');
+});
+
+app.get('/signup', 
+(req, res) => {
+  res.render('signup');
+});
+
+app.post('/signup',
+(req, res, next) => {
+  console.log(req.body);
+  var username = req.body.username; //will the asynchronous nature cause problems
+  var password = req.body.password;
+  //salt and hash password using helper
+  //create user in database w/ password and salt
+  //(eventually need to create a session and respond with cookie request)
+  //respond with created 201 status
 });
 
 app.get('/links', 
@@ -77,6 +105,8 @@ app.post('/links',
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
+
+
 
 
 
