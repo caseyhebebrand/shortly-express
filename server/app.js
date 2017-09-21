@@ -55,14 +55,14 @@ app.post('/signup',
       //make new user
       models.Users.create({username, password})
         .then((user) => {
-          res.redirect('login');
+          res.redirect('/'); //changed this from login to index (need cookie/session sent)
         })
         .error(error => {
           res.status(500).send(error);
         });
     } else {
       //Error: username already taken
-      res.redirect('signup');
+      res.redirect('/signup');
     }
     
   })
@@ -87,8 +87,40 @@ app.get('/login',
 
 app.post('/login',
 (req, res, next) => {
-  
+  // get username and password from req.body
+  var username = req.body.username;
+  var attemptedPassword = req.body.password;
+  // see if username valid
+  models.Users.getAll( {username: username} ).then((results) => {
+    if (results.length !== 0) {
+      var salt = results[0].salt;
+      var currentPassword = results[0].password;    
+      var boolean = models.Users.compare(attemptedPassword, currentPassword, salt);
+      if (boolean) {
+        //create session
+        isLoggedIn = true;
+        res.redirect('/');
+      } else {
+        res.redirect('/login');
+      }
+    } else {
+      res.redirect('/login');
+    }
+  }).error( error => {
+    res.send(error);
+    console.log(error);
+  });
+    //if user name valid
+      // hash password with username salt
+      //compare hash password and salt with db for that user
+        // if password valid
+          // create session (helper function auth.js)
+          // reidrect to index
+        // if not valid
+          // stay on login
+    // if username not valid stay on login
 });
+
 
 app.get('/links', 
 (req, res, next) => {
