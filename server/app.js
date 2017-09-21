@@ -6,6 +6,10 @@ const bodyParser = require('body-parser');
 const Auth = require('./middleware/auth');
 const models = require('./models');
 
+//added these:
+const user = require('./models/user.js');
+//=======
+
 const app = express();
 
 app.set('views', `${__dirname}/views`);
@@ -34,25 +38,56 @@ app.get('/create',
   res.render('index');
 });
 
-app.get('/login', 
-(req, res) => {
-  res.render('login');
-});
-
 app.get('/signup', 
 (req, res) => {
+  console.log(req.headers);
   res.render('signup');
 });
 
 app.post('/signup',
 (req, res, next) => {
-  console.log(req.body);
-  var username = req.body.username; //will the asynchronous nature cause problems
+  var username = req.body.username; //will the asynchronous nature cause problems??
   var password = req.body.password;
   //salt and hash password using helper
   //create user in database w/ password and salt
+  models.Users.getAll({username: username}).then((results) => {
+    if (results.length === 0) {
+      //make new user
+      models.Users.create({username, password})
+        .then((user) => {
+          res.redirect('login');
+        })
+        .error(error => {
+          res.status(500).send(error);
+        });
+    } else {
+      //Error: username already taken
+      res.redirect('signup');
+    }
+    
+  })
+  .error(error => {
+    res.send(error);
+    console.log(error);
+  });
+  
+  // user.create({ username, password})
+  
   //(eventually need to create a session and respond with cookie request)
-  //respond with created 201 status
+  //or should we just redirect to login page??
+  //respond with created 201 status?
+  
+});
+
+app.get('/login', 
+(req, res) => {
+  res.render('login');
+});
+
+
+app.post('/login',
+(req, res, next) => {
+  
 });
 
 app.get('/links', 
@@ -68,6 +103,7 @@ app.get('/links',
 
 app.post('/links', 
 (req, res, next) => {
+
   var url = req.body.url;
   if (!models.Links.isValidUrl(url)) {
     // send back a 404 if link is not valid
