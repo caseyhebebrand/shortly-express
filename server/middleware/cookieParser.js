@@ -6,7 +6,7 @@ const parseCookies = (req, res, next) => {
       var tuple = cookieStr.split('=');
       req.cookies[tuple[0]] = tuple[1];
     });
-    console.log(req.cookies);
+    // console.log(req.cookies);
     next();
   } else {
     next();

@@ -28,6 +28,10 @@ var checkLogin = function(req, res, next) {
   }
 };
 
+app.use(require('./middleware/cookieParser'));
+app.use(Auth.createSession);
+
+
 app.get('/', checkLogin,
 (req, res) => {
   res.render('index');
@@ -99,6 +103,8 @@ app.post('/login',
       if (boolean) {
         //create session
         isLoggedIn = true;
+        return models.Sessions.update({ hash: req.session.hash}, { userId: results[0].id});
+        
         res.redirect('/');
       } else {
         res.redirect('/login');
