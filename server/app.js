@@ -6,10 +6,6 @@ const bodyParser = require('body-parser');
 const Auth = require('./middleware/auth');
 const models = require('./models');
 
-//added these:
-const user = require('./models/user.js');
-//=======
-
 const app = express();
 
 app.set('views', `${__dirname}/views`);
@@ -19,116 +15,21 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '../public')));
 
-var isLoggedIn = false;
-var checkLogin = function(req, res, next) {
-  if (isLoggedIn) {
-    next();
-  } else {
-    res.redirect('/login');
-  }
-};
-
+//use middleware
 app.use(require('./middleware/cookieParser'));
 app.use(Auth.createSession);
 
-
-app.get('/', checkLogin,
+app.get('/', Auth.verifySession,
 (req, res) => {
   res.render('index');
 });
 
-app.get('/create', 
+app.get('/create', Auth.verifySession,
 (req, res) => {
   res.render('index');
 });
 
-app.get('/signup', 
-(req, res) => {
-  console.log(req.headers);
-  res.render('signup');
-});
-
-app.post('/signup',
-(req, res, next) => {
-  var username = req.body.username; //will the asynchronous nature cause problems??
-  var password = req.body.password;
-  //salt and hash password using helper
-  //create user in database w/ password and salt
-  models.Users.getAll({username: username}).then((results) => {
-    if (results.length === 0) {
-      //make new user
-      models.Users.create({username, password})
-        .then((user) => {
-          res.redirect('/'); //changed this from login to index (need cookie/session sent)
-        })
-        .error(error => {
-          res.status(500).send(error);
-        });
-    } else {
-      //Error: username already taken
-      res.redirect('/signup');
-    }
-    
-  })
-  .error(error => {
-    res.send(error);
-    console.log(error);
-  });
-  
-  // user.create({ username, password})
-  
-  //(eventually need to create a session and respond with cookie request)
-  //or should we just redirect to login page??
-  //respond with created 201 status?
-  
-});
-
-app.get('/login', 
-(req, res) => {
-  res.render('login');
-});
-
-
-app.post('/login',
-(req, res, next) => {
-  // get username and password from req.body
-  var username = req.body.username;
-  var attemptedPassword = req.body.password;
-  // see if username valid
-  models.Users.getAll( {username: username} ).then((results) => {
-    if (results.length !== 0) {
-      var salt = results[0].salt;
-      var currentPassword = results[0].password;    
-      var boolean = models.Users.compare(attemptedPassword, currentPassword, salt);
-      if (boolean) {
-        //create session
-        isLoggedIn = true;
-        return models.Sessions.update({ hash: req.session.hash}, { userId: results[0].id});
-        
-        res.redirect('/');
-      } else {
-        res.redirect('/login');
-      }
-    } else {
-      res.redirect('/login');
-    }
-  }).error( error => {
-    res.send(error);
-    console.log(error);
-  });
-    //if user name valid
-      // hash password with username salt
-      //compare hash password and salt with db for that user
-        // if password valid
-          // create session (helper function auth.js)
-          // reidrect to index
-        // if not valid
-          // stay on login
-    // if username not valid stay on login
-});
-
-
-app.get('/links', 
+app.get('/links', Auth.verifySession,
 (req, res, next) => {
   models.Links.getAll()
     .then(links => {
@@ -139,9 +40,8 @@ app.get('/links',
     });
 });
 
-app.post('/links', 
+app.post('/links', Auth.verifySession,
 (req, res, next) => {
-
   var url = req.body.url;
   if (!models.Links.isValidUrl(url)) {
     // send back a 404 if link is not valid
@@ -179,10 +79,82 @@ app.post('/links',
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
+app.get('/login',
+(req, res) => {
+  res.render('login');
+});
 
+app.post('/login', (req, res, next) => {
+  var username = req.body.username;
+  var password = req.body.password;
+  // check username
+  return models.Users.get({username})
+    .then( (user) => {
+       if (!user || !models.Users.compare(password, user.password, user.salt)) {
+         throw new Error('username and password do not match');
+       }
+       // update session with userid;
+       console.log(user.id)
+       return models.Sessions.update({hash: req.session.hash}, {userId: user.id});
+    })
+    .then( () => {
+      console.log('successful login redirect to index');
 
+      res.redirect('/');
+    })
+    .error( error => {
+      res.status(500).send(error);
+    })
+    .catch( () => {
+      res.redirect('/login');
+    });
+});
 
+app.get('/logout', (req, res, noxt) => {
+  return models.Sessions.delete({hash: req.cookies.shortlyid})
+    .then( () => {
+      res.clearCookie('shortlyid');
+      res.redirect('/login');
+    })
+    .error(error => {
+      res.status(500).send(error);
+    })
+});
 
+app.get('/signup',
+(req, res) => {
+  res.render('signup');
+});
+
+app.post('/signup', (req, res, next) => {
+  var username = req.body.username;
+  var password = req.body.password;
+  // see if the user exists already
+  return models.Users.get({username})
+    .then((user) => {
+      if (user) {
+        throw user;
+      }
+      // create a new user, return promise object
+      return models.Users.create({username, password});
+
+    })
+    .then( (results) => {
+      // update session with userId
+      //req.session.user = results;
+      return models.Sessions.update({hash: req.session.hash}, {userId: results.insertId});
+    })
+    .then( () => {
+      // redirect to index
+      res.redirect('/')
+    })
+    .error( error => {
+      res.status(500).send(error);
+    })
+    .catch( (user) => {
+      res.redirect('/signup');
+    });
+});
 
 /************************************************************/
 // Handle the code parameter route last - if all other routes fail

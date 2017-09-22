@@ -1,18 +1,18 @@
 const parseCookies = (req, res, next) => {
-  req.cookies = {};
-  if (req.headers.cookie) {
-    var array = req.headers.cookie.split('; ');
-    array.forEach(function(cookieStr) {
-      var tuple = cookieStr.split('=');
-      req.cookies[tuple[0]] = tuple[1];
-    });
-    // console.log(req.cookies);
-    next();
-  } else {
-    next();
-  }
-  
-  
-}; 
+  var cookieStr = req.get('Cookie') || '';
+
+  parsedCookieObj = cookieStr.split('; ').reduce((obj, cookie) => {
+    if (cookie.length) {
+      let index = cookie.indexOf('=');
+      let key = cookie.slice(0, index);
+      let token = cookie.slice(index + 1);
+      obj[key] = token;
+    }
+    return obj;
+  }, {});
+
+  req.cookies = parsedCookie;
+  next();
+};
 
 module.exports = parseCookies;
